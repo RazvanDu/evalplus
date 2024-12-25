@@ -9,6 +9,8 @@ from evalplus.provider.utility import (
     make_raw_chat_prompt,
 )
 
+cache_directory = "/mnt/razvandu/speculative_decoding/models_cache"
+
 
 class HuggingFaceDecoder(DecoderBase):
     def __init__(
@@ -17,18 +19,12 @@ class HuggingFaceDecoder(DecoderBase):
         dataset: str,
         force_base_prompt: bool = False,
         attn_implementation: str = "eager",
-        device_map: str = None,
+        device_map: str = "auto",
         **kwargs,
     ):
         super().__init__(name=name, **kwargs)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        kwargs = {
-            "device_map": device_map,
-            "trust_remote_code": self.trust_remote_code,
-            "torch_dtype": getattr(torch, self.dtype),
-            "attn_implementation": attn_implementation,  # "eager", "flash_attention_2", "sdpa"
-        }
         self.skip_special_tokens = True
 
         print(f"{kwargs = }")
@@ -41,7 +37,9 @@ class HuggingFaceDecoder(DecoderBase):
             self.eos += ["\n```\n"]
 
         print(f"{self.eos = }")
-        self.model = AutoModelForCausalLM.from_pretrained(name, **kwargs)
+        #print("HERE1")
+        self.model = AutoModelForCausalLM.from_pretrained(name, cache_dir=cache_directory, device_map=device_map)
+        #print("HERE2")
         self.model = self.model.to(self.device)
 
     def is_direct_completion(self) -> bool:
@@ -51,6 +49,7 @@ class HuggingFaceDecoder(DecoderBase):
     def codegen(
         self, prompt: str, do_sample: bool = True, num_samples: int = 200
     ) -> List[str]:
+        
         if self.temperature == 0:
             assert not do_sample
             assert num_samples == 1
@@ -62,6 +61,7 @@ class HuggingFaceDecoder(DecoderBase):
                 prompt, self.instruction_prefix, self.response_prefix, self.tokenizer
             )
         )
+        #print("PROMPT", prompt)
         input_tokens = self.tokenizer.encode(prompt, return_tensors="pt").to(
             self.device
         )
@@ -72,19 +72,19 @@ class HuggingFaceDecoder(DecoderBase):
 
         outputs = self.model.generate(
             input_tokens,
-            max_new_tokens=self.max_new_tokens,
-            do_sample=do_sample,
-            num_return_sequences=min(self.batch_size, num_samples),
-            pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
-            stop_strings=self.eos,
+            max_new_tokens=300,
+            do_sample=False,
+            #num_return_sequences=min(self.batch_size, num_samples),
+            #pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
+            #stop_strings=self.eos,
             tokenizer=self.tokenizer,
-            **kwargs,
         )
 
         gen_strs = self.tokenizer.batch_decode(
             outputs[:, input_tokens.size(-1) :],
             skip_special_tokens=self.skip_special_tokens,
         )
+        print("OUTPUT:", gen_strs[0])
         outputs = []
         # removes eos tokens.
         for output in gen_strs:
@@ -93,4 +93,8 @@ class HuggingFaceDecoder(DecoderBase):
                 if eos in output:
                     min_index = min(min_index, output.index(eos))
             outputs.append(output[:min_index].replace("\t", "    "))
+        # print(outputs)
+
+        print("OUTPUTS:", outputs)
+
         return outputs

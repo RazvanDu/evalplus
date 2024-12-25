@@ -116,4 +116,20 @@ def make_model(
             trust_remote_code=trust_remote_code,
             gptqmodel_backend=gptqmodel_backend,
         )
+    elif backend == "spec":
+        from evalplus.provider.spec import SpeculativeDecoderProvider
+
+        print("[DEBUG] Entering SpeculativeDecoderProvider branch in make_model.")
+
+        return SpeculativeDecoderProvider(
+            name=model,
+            secondary_model="openai-community/gpt2",  # Secondary model
+            dataset=dataset,
+            force_base_prompt=force_base_prompt,
+            device_map=device_map,
+            instruction_prefix=instruction_prefix,
+            response_prefix=response_prefix,
+            trust_remote_code=trust_remote_code,
+            dtype=dtype,
+            )
 
