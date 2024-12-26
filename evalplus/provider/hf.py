@@ -11,7 +11,6 @@ from evalplus.provider.utility import (
 
 cache_directory = "/mnt/razvandu/speculative_decoding/models_cache"
 
-
 class HuggingFaceDecoder(DecoderBase):
     def __init__(
         self,
@@ -31,6 +30,9 @@ class HuggingFaceDecoder(DecoderBase):
 
         self.force_base_prompt = force_base_prompt
         self.tokenizer = AutoTokenizer.from_pretrained(name, use_fast=False)
+
+        #print("AAAA", force_base_prompt, self.is_direct_completion(), self.tokenizer.chat_template)
+
         if self.is_direct_completion():  # no chat template
             self.eos += extra_eos_for_direct_completion(dataset)
         else:  # with chat template
@@ -84,7 +86,7 @@ class HuggingFaceDecoder(DecoderBase):
             outputs[:, input_tokens.size(-1) :],
             skip_special_tokens=self.skip_special_tokens,
         )
-        print("OUTPUT:", gen_strs[0])
+        #print("OUTPUT:", gen_strs[0])
         outputs = []
         # removes eos tokens.
         for output in gen_strs:

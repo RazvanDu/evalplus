@@ -73,7 +73,10 @@ class SpeculativeDecoderProvider(DecoderBase):
         print("[DEBUG] SpeculativeDecoder initialized successfully.")
 
         # Tokenizer and EOS settings
+
         self.tokenizer = self.decoder.tokenizer        
+
+        print("TEST", self.is_direct_completion())
         
         if self.is_direct_completion():  # no chat template
             self.eos += extra_eos_for_direct_completion(dataset)
@@ -105,7 +108,6 @@ class SpeculativeDecoderProvider(DecoderBase):
         Returns:
             List[str]: List of generated code outputs.
         """
-        print(f"[DEBUG] SpeculativeDecoderProvider.codegen called with prompt: {prompt[:50]}...")
 
         if num_samples > 1:
             raise ValueError("[ERROR] SpeculativeDecoderProvider only supports num_samples=1 currently.")
@@ -118,12 +120,13 @@ class SpeculativeDecoderProvider(DecoderBase):
                 prompt, self.instruction_prefix, self.response_prefix, self.tokenizer
             )
         )
+        #print(f"[DEBUG] SpeculativeDecoderProvider.codegen called with prompt: {formatted_prompt}")
 
         # Generate using speculative decoding
         try:
 
                 
-            input_tokens = self.tokenizer.encode(prompt, return_tensors="pt").to(
+            input_tokens = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(
                 self.device
             )
 
@@ -139,14 +142,16 @@ class SpeculativeDecoderProvider(DecoderBase):
             #)
 
             
-            generated_text, accepted_tokens = self.decoder.generate_raw_regenerateKV(
+            generated_text, accepted_tokens = self.decoder.generate_raw(
                 formatted_prompt,
                 temperature=0.0,
                 top_k=0,
                 top_p=1,
-                gamma=5,
+                gamma=4,
                 max_new_tokens=300,
             )
+
+            #print("TESTT", generated_text)
 
             #outputs = outputs[:, input_tokens.size(-1) :]
             generated_text = generated_text[:, input_tokens.size(-1) :]
@@ -170,7 +175,7 @@ class SpeculativeDecoderProvider(DecoderBase):
 
             self.total_copy += accepted_tokens
             #print("GEN:", outputs)
-            print("GEN COPY:", generated_text)
+            #print("GEN COPY:", generated_text)
             #print(f"[DEBUG] Generated text length: {len(generated_text)}; Tokens accepted: {accepted_tokens}")
             #print(f"[DEBUG] TOTALLLLL Tokens accepted: {self.total_copy}")
 
