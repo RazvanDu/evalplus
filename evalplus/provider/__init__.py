@@ -25,6 +25,7 @@ def make_model(
     device_map=None,
     # gptqmodel only
     gptqmodel_backend: str = 'auto',
+    gamma: int = 5,
 ) -> DecoderBase:
     if backend == "vllm":
         from evalplus.provider.vllm import VllmDecoder
@@ -131,5 +132,6 @@ def make_model(
             response_prefix=response_prefix,
             trust_remote_code=trust_remote_code,
             dtype=dtype,
+            gamma=gamma,
             )
 

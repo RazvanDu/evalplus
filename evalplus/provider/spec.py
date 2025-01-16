@@ -30,6 +30,7 @@ class SpeculativeDecoderProvider(DecoderBase):
         device_map: str = "auto",
         dtype: str = "float16",
         max_new_tokens: int = 300,
+        gamma: int = 5,
         **kwargs,
     ):
         """
@@ -56,6 +57,7 @@ class SpeculativeDecoderProvider(DecoderBase):
         self.instruction_prefix = instruction_prefix
         self.response_prefix = response_prefix
         self.total_copy = 0
+        self.gamma = gamma
 
         print(f"[DEBUG] Initializing SpeculativeDecoderProvider for model: {name} on device: {self.device}")
 
@@ -76,7 +78,7 @@ class SpeculativeDecoderProvider(DecoderBase):
 
         self.tokenizer = self.decoder.tokenizer        
 
-        print("TEST", self.is_direct_completion())
+        #print("TEST", self.is_direct_completion())
         
         if self.is_direct_completion():  # no chat template
             self.eos += extra_eos_for_direct_completion(dataset)
@@ -85,7 +87,7 @@ class SpeculativeDecoderProvider(DecoderBase):
 
         self.total_tokens = 0
 
-        print(f"{self.eos = }")
+        #print(f"{self.eos = }")
 
     def is_direct_completion(self) -> bool:
         """
@@ -95,7 +97,7 @@ class SpeculativeDecoderProvider(DecoderBase):
 
     @torch.inference_mode()
     def codegen(
-        self, prompt: str, do_sample: bool = True, num_samples: int = 1
+        self, prompt: str, do_sample: bool = True, num_samples: int = 1,
     ) -> List[str]:
         """
         Generate code using speculative decoding.
@@ -147,8 +149,8 @@ class SpeculativeDecoderProvider(DecoderBase):
                 temperature=0.0,
                 top_k=0,
                 top_p=1,
-                gamma=4,
-                max_new_tokens=300,
+                gamma=self.gamma,
+                max_new_tokens=1024,
             )
 
             #print("TESTT", generated_text)
@@ -173,8 +175,10 @@ class SpeculativeDecoderProvider(DecoderBase):
                 skip_special_tokens=self.skip_special_tokens,
             )[0]
 
+            #print("TTT", generated_text)
+
             self.total_copy += accepted_tokens
-            #print("GEN:", outputs)
+            print("GEN:", generated_text)
             #print("GEN COPY:", generated_text)
             #print(f"[DEBUG] Generated text length: {len(generated_text)}; Tokens accepted: {accepted_tokens}")
             #print(f"[DEBUG] TOTALLLLL Tokens accepted: {self.total_copy}")
@@ -196,7 +200,7 @@ class SpeculativeDecoderProvider(DecoderBase):
                 min_index = min(min_index, generated_text.index(eos))
         cleaned_output = generated_text[:min_index].replace("\t", "    ")
 
-        print(f"[DEBUG] Final cleaned output: {cleaned_output}")
-        print("\n\n")
+        #print(f"[DEBUG] Final cleaned output: {cleaned_output}")
+        #print("\n\n")
         print(f"[DEBUG] TOTALLLLL Tokens accepted: {self.total_copy}")
         return [cleaned_output]
