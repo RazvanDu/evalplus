@@ -1,10 +1,11 @@
 from typing import List
 
 import sys
+import os
 
-cache_directory = "/mnt/razvandu/speculative_decoding/models_cache"
+cache_directory = os.getenv("cache_dir")
+custom_path = os.getenv("copyspec_path")
 
-custom_path = "/mnt/razvandu/speculative_decoding/"
 if custom_path not in sys.path:
     sys.path.append(custom_path)
 
@@ -22,7 +23,7 @@ class SpeculativeDecoderProvider(DecoderBase):
     def __init__(
         self,
         name: str,
-        secondary_model: str = "openai-community/gpt2",
+        secondary_model: str = "",
         dataset: str = "",
         force_base_prompt: bool = False,
         instruction_prefix: str = "",
@@ -49,8 +50,6 @@ class SpeculativeDecoderProvider(DecoderBase):
         """
         super().__init__(name=name, **kwargs)
 
-        #print("AAA", kwargs)
-
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.max_new_tokens = max_new_tokens
         self.force_base_prompt = force_base_prompt
@@ -61,12 +60,6 @@ class SpeculativeDecoderProvider(DecoderBase):
 
         print(f"[DEBUG] Initializing SpeculativeDecoderProvider for model: {name} on device: {self.device}")
 
-        # Initialize SpeculativeDecoder
-        
-        #self.model = AutoModelForCausalLM.from_pretrained(name, cache_dir=cache_directory, **kwargs)
-        #print("HERE2")
-        #self.model = self.model.to(self.device)
-
         self.decoder = SpeculativeDecoder(
             target_model_name=name,
             draft_model_name=secondary_model,
@@ -76,9 +69,7 @@ class SpeculativeDecoderProvider(DecoderBase):
 
         # Tokenizer and EOS settings
 
-        self.tokenizer = self.decoder.tokenizer        
-
-        #print("TEST", self.is_direct_completion())
+        self.tokenizer = self.decoder.tokenizer
         
         if self.is_direct_completion():  # no chat template
             self.eos += extra_eos_for_direct_completion(dataset)
@@ -86,8 +77,6 @@ class SpeculativeDecoderProvider(DecoderBase):
             self.eos += ["\n```\n"]
 
         self.total_tokens = 0
-
-        #print(f"{self.eos = }")
 
     def is_direct_completion(self) -> bool:
         """
@@ -122,7 +111,7 @@ class SpeculativeDecoderProvider(DecoderBase):
                 prompt, self.instruction_prefix, self.response_prefix, self.tokenizer
             )
         )
-        #print(f"[DEBUG] SpeculativeDecoderProvider.codegen called with prompt: {formatted_prompt}")
+        print("PROMPT:", formatted_prompt)
 
         # Generate using speculative decoding
         try:
@@ -132,18 +121,6 @@ class SpeculativeDecoderProvider(DecoderBase):
                 self.device
             )
 
-
-            #outputs = self.model.generate(
-            #    input_tokens,
-            #    max_new_tokens=300,
-            #    do_sample=do_sample,
-            #    #num_return_sequences=min(self.batch_size, num_samples),
-            #    #pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
-            #    #stop_strings=self.eos,
-            #    tokenizer=self.tokenizer,
-            #)
-
-            
             generated_text, accepted_tokens = self.decoder.generate_raw(
                 formatted_prompt,
                 temperature=0.0,
@@ -152,47 +129,22 @@ class SpeculativeDecoderProvider(DecoderBase):
                 gamma=self.gamma,
                 max_new_tokens=1024,
             )
-
-            #print("TESTT", generated_text)
-
-            #outputs = outputs[:, input_tokens.size(-1) :]
             generated_text = generated_text[:, input_tokens.size(-1) :]
 
             self.total_tokens += len(generated_text[0])
             
-            print(self.total_tokens, "tokens generated thus far!")
-
-            #print("LEN:", len(outputs[0]))
-            #print("LEN COPY:", len(generated_text[0]))
-
-            #outputs = self.tokenizer.batch_decode(
-            #    outputs,
-            #    skip_special_tokens=self.skip_special_tokens,
-            #)[0]
+            #print(self.total_tokens, "tokens generated thus far!")
             
             generated_text = self.tokenizer.batch_decode(
                 generated_text,
                 skip_special_tokens=self.skip_special_tokens,
             )[0]
 
-            #print("TTT", generated_text)
-
             self.total_copy += accepted_tokens
-            print("GEN:", generated_text)
-            #print("GEN COPY:", generated_text)
-            #print(f"[DEBUG] Generated text length: {len(generated_text)}; Tokens accepted: {accepted_tokens}")
-            #print(f"[DEBUG] TOTALLLLL Tokens accepted: {self.total_copy}")
 
         except Exception as e:
             print(f"[ERROR] SpeculativeDecoderProvider.codegen failed: {e}")
             return []
-
-        # Truncate at first EOS token
-        #eos_index = min(
-        #    (generated_text.find(eos) for eos in self.eos if eos in generated_text),
-        #    default=len(generated_text),
-        #)
-        #cleaned_output = generated_text[:eos_index].strip()
 
         min_index = 10000
         for eos in self.eos:
@@ -200,7 +152,5 @@ class SpeculativeDecoderProvider(DecoderBase):
                 min_index = min(min_index, generated_text.index(eos))
         cleaned_output = generated_text[:min_index].replace("\t", "    ")
 
-        #print(f"[DEBUG] Final cleaned output: {cleaned_output}")
-        #print("\n\n")
         print(f"[DEBUG] TOTALLLLL Tokens accepted: {self.total_copy}")
         return [cleaned_output]

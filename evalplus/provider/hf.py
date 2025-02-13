@@ -9,7 +9,9 @@ from evalplus.provider.utility import (
     make_raw_chat_prompt,
 )
 
-cache_directory = "/mnt/razvandu/speculative_decoding/models_cache"
+import os
+
+cache_directory = os.getenv("cache_dir")
 
 class HuggingFaceDecoder(DecoderBase):
     def __init__(

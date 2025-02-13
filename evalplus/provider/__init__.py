@@ -124,7 +124,7 @@ def make_model(
 
         return SpeculativeDecoderProvider(
             name=model,
-            secondary_model="openai-community/gpt2",  # Secondary model
+            secondary_model="",  # Secondary model
             dataset=dataset,
             force_base_prompt=force_base_prompt,
             device_map=device_map,
